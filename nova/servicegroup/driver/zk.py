@@ -142,7 +142,10 @@ class ZookeeperDriver(base.Driver):
                 
             monitor = membership.MembershipMonitor(local_session, path)
             self._monitors[group_id] = monitor
-            
+            # Note(maoy): When initialized for the first time, it takes a
+            # while to retrieve all members from zookeeper. To prevent
+            # None to be returned, we sleep 5 sec max to wait for data to
+            # be ready.
             timeout = 5
             interval = 0.1
             tries = int(timeout / interval)
