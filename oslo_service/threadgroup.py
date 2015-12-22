@@ -7,11 +7,7 @@ from eventlet import greenpool
 
 from oslo_service.i18n import _LE
 from oslo_service import loopingcall
-<<<<<<< HEAD
 
-LOG = logging.getLogger(__name__)
-=======
-from sre_constants import GROUPREF_IGNORE
 
 LOG = logging.getLogger(__name__)
 
@@ -79,4 +75,69 @@ class ThreadGroup(object):
                     initial_delay=initial_delay)
         self.timers.append(pulse)
     
->>>>>>> origin/olso_service
+    def add_thread(self, callback, *args, **kwargs):
+        gt = self.pool.spawn(callback, *args, **kwargs)
+        th = Thread(gt, self)
+        self.threads.append(th)
+        return th
+    
+    def thread_done(self, thread):
+        self.threads.remove(thread)
+    
+    def time_done(self, timer):
+        self.times.remove(timer)
+        
+    def _stop_threads(self):
+        current = threading.current_thread()
+        
+        for x in self.threads[:]:
+            if x.ident == current.ident:
+                # don't kill the current thread.
+                continue
+            try:
+                x.stop()
+            except eventlet.greenlet.GreenletExit:
+                pass
+            except Exception:
+                LOG.exception()
+    
+    def stop_timers(self):
+        for x in self.timers:
+            try:
+                x.stop()
+            except Exception:
+                LOG.exception()
+        self.timers = []
+        
+    def stop(self, graceful=False):
+        """stop function has the option of graceful=True/False. 
+        
+        * In case of graceful=True, wait for all threads to be finished.
+          Never kill threads.
+        * In case of graceful=False, kill threads immediately.
+        """
+        self.stop_timers()
+        if graceful:
+            self.wait()
+        else:
+            self._stop_threads()
+            
+    def wait(self):
+        for x in self.timers:
+            try:
+                x.wait()
+            except eventlet.greenlet.GreenletExit:
+                pass
+            except Exception:
+                LOG.exception();
+        current = threading.current_thread()
+        
+        for x in self.threads[:]:
+            if x.ident == current.ident:
+                continue
+            try:
+                x.wait()
+            except eventlet.greenlet.GreenletExit:
+                pass
+            except Exception as ex:
+                LOG.exception(ex)
